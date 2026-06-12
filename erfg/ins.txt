@@ -1,0 +1,74 @@
+-- Начинаем новый сеанс мониторинга
+INSERT INTO monitoring_sessions (start_time, notes) 
+VALUES (CURRENT_TIMESTAMP, 'Сбор информации о системе 2026-06-12');
+
+-- Получаем ID сессии (допустим, последняя вставка)
+-- На практике используйте last_insert_rowid() или сохраните ID в переменной приложения
+SELECT last_insert_rowid(); -- Предположим, session_id = 1
+
+-- Вставка ОС
+INSERT INTO operating_system (session_id, system_name, version, build, platform, architecture, computer_name, manufacturer, install_date, uptime)
+VALUES (1, 'Windows', '10', '10.0.19044', 'Windows-10-10.0.19044-SP0', '64bit', '15-2-441-5', 'Майкрософт Windows 10 Корпоративная LTSC', '20230411', '20260612142733.500000+180');
+
+-- Вставка CPU
+INSERT INTO cpu (session_id, model, manufacturer, architecture, physical_cores, logical_cores, max_frequency_mhz, l2_cache_kb, l3_cache_kb, socket, current_frequency_mhz, load_percent)
+VALUES (1, 'Intel(R) Core(TM) i5-8400 CPU @ 2.80GHz', 'GenuineIntel', 'x64', 6, 6, 2808, 1536, 9216, 'LGA1151', 2808.0, 33.4);
+
+-- Вставка общей информации о RAM
+INSERT INTO ram_summary (session_id, total_gb, used_gb, available_gb, usage_percent, total_pagefile_gb, used_pagefile_gb, pagefile_usage_percent, max_capacity_gb, total_slots, physically_installed_gb)
+VALUES (1, 31.84, 11.68, 20.16, 36.7, 4.75, 0.00, 0.0, 0, 0, 0.00);
+
+-- Вставка модулей памяти
+INSERT INTO ram_modules (session_id, bank_label, size_gb, manufacturer, speed_mhz, model)
+VALUES 
+    (1, 'BANK 2', 16.0, 'Kingston', 2666, '9905701-076.A00G'),
+    (1, 'BANK 3', 16.0, 'Kingston', 2666, '9905701-020.A00G');
+
+-- Вставка топ-процессов по памяти
+INSERT INTO top_memory_processes (session_id, process_name, pid, memory_used_gb, rank_position)
+VALUES 
+    (1, 'sqlservr.exe', 10804, 1.46, 1),
+    (1, 'Code.exe', 15944, 0.80, 2),
+    (1, 'sqlservr.exe', 10656, 0.68, 3),
+    (1, 'sqlservr.exe', 10428, 0.63, 4),
+    (1, 'sqlservr.exe', 6836, 0.52, 5);
+
+-- Вставка логических дисков
+INSERT INTO logical_disks (session_id, drive_letter, mount_point, filesystem, total_size_gb, used_percent, free_gb, used_gb)
+VALUES 
+    (1, 'C:', 'C:\', 'NTFS', 165.4, 94.6, 9.0, 156.4),
+    (1, 'D:', 'D:\', 'NTFS', 299.7, 9.3, 271.9, 27.8);
+
+-- Вставка физических дисков
+INSERT INTO physical_drives (session_id, drive_number, device_path, model, size_gb, type, interface_type, media_type)
+VALUES (1, 0, '\\.\PHYSICALDRIVE0', 'Samsung SSD 860 EVO 500GB', 465.8, 'SSD', 'IDE', 'Fixed hard disk media');
+
+-- Связываем логический диск C: с физическим диском 0
+INSERT INTO disk_mapping (session_id, logical_disk_id, physical_drive_id)
+SELECT 1, d.disk_id, p.physical_drive_id
+FROM logical_disks d, physical_drives p
+WHERE d.drive_letter = 'C:' AND p.drive_number = 0;
+
+-- Вставка GPU
+INSERT INTO gpus (session_id, gpu_index, model, memory_gb, driver_version)
+VALUES (1, 0, 'Intel(R) UHD Graphics 630', 1.0, '31.0.101.2125');
+
+-- Вставка сетевых адаптеров (пример для одного активного)
+INSERT INTO network_adapters (session_id, adapter_index, name, status, mac_address, ipv4_address, subnet_mask, adapter_type)
+VALUES (1, 2, 'Ethernet 2', 'Активен', '04-D4-C4-AA-90-9C', '127.0.0.1', '255.0.0.0', 'Realtek');
+
+-- Вставка материнской платы
+INSERT INTO motherboard (session_id, manufacturer, model, version, serial_number, bios_manufacturer, bios_version, bios_date)
+VALUES (1, 'ASUSTeK COMPUTER INC.', 'PRIME B360M-A', 'Rev X.0x', '190448627601988', 'American Megatrends Inc.', 'ALASKA - 1072009', '20190410000000.000000+000');
+
+-- Вставка мониторов
+INSERT INTO monitors (session_id, monitor_name, resolution, device_path, is_primary)
+VALUES (1, 'LG IPSFULLHD(HDMI)', '1920x1080', '\\.\DISPLAY1', 1);
+
+-- Вставка сводки по мониторам
+INSERT INTO monitors_summary (session_id, physical_count, total_count)
+VALUES (1, 1, 1);
+
+-- Вставка информации о батарее (нет)
+INSERT INTO battery (session_id, detected, notes)
+VALUES (1, 0, 'Не обнаружена (возможно, стационарный ПК)');
