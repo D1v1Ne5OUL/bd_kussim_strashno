@@ -1,20 +1,13 @@
+import sqlite3
+import os
+from datetime import datetime
 
+DB_PATH = "system_monitor.db"
 
-
--- ============================================================
--- БАЗА ДАННЫХ: system_monitor.db
--- НАЗНАЧЕНИЕ: Хранение информации о конфигурации и состоянии системы
--- ============================================================
-
--- Включаем поддержку внешних ключей
+SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
-
--- Включаем WAL для производительности
 PRAGMA journal_mode = WAL;
 
--- ============================================================
--- ТАБЛИЦА 1: Сеансы мониторинга
--- ============================================================
 CREATE TABLE IF NOT EXISTS monitoring_sessions (
     session_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     start_time      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -22,125 +15,101 @@ CREATE TABLE IF NOT EXISTS monitoring_sessions (
     notes           TEXT
 );
 
--- ============================================================
--- ТАБЛИЦА 2: Операционная система
--- ============================================================
 CREATE TABLE IF NOT EXISTS operating_system (
     os_id           INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    system_name     TEXT,                    -- "Windows"
-    version         TEXT,                    -- "10"
-    build           TEXT,                    -- "10.0.19044"
-    platform        TEXT,                    -- "Windows-10-10.0.19044-SP0"
-    architecture    TEXT,                    -- "64bit"
-    computer_name   TEXT,                    -- "15-2-441-5"
-    manufacturer    TEXT,                    -- "Майкрософт Windows 10 Корпоративная LTSC"
-    install_date    TEXT,                    -- "20230411"
-    uptime          TEXT,                    -- "20260612142733.500000+180"
+    system_name     TEXT,
+    version         TEXT,
+    build           TEXT,
+    platform        TEXT,
+    architecture    TEXT,
+    computer_name   TEXT,
+    manufacturer    TEXT,
+    install_date    TEXT,
+    uptime          TEXT,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 3: Процессор (основная информация)
--- ============================================================
 CREATE TABLE IF NOT EXISTS cpu (
     cpu_id          INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    model           TEXT,                    -- "Intel(R) Core(TM) i5-8400 CPU @ 2.80GHz"
-    manufacturer    TEXT,                    -- "GenuineIntel"
-    architecture    TEXT,                    -- "x64"
-    physical_cores  INTEGER,                 -- 6
-    logical_cores   INTEGER,                 -- 6
-    max_frequency_mhz INTEGER,               -- 2808
-    l2_cache_kb     INTEGER,                 -- 1536
-    l3_cache_kb     INTEGER,                 -- 9216
-    socket          TEXT,                    -- "LGA1151"
-    current_frequency_mhz REAL,              -- 2808.0
-    load_percent    REAL,                    -- 33.4
+    model           TEXT,
+    manufacturer    TEXT,
+    architecture    TEXT,
+    physical_cores  INTEGER,
+    logical_cores   INTEGER,
+    max_frequency_mhz INTEGER,
+    l2_cache_kb     INTEGER,
+    l3_cache_kb     INTEGER,
+    socket          TEXT,
+    current_frequency_mhz REAL,
+    load_percent    REAL,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 4: Оперативная память (общая статистика)
--- ============================================================
 CREATE TABLE IF NOT EXISTS ram_summary (
     ram_summary_id  INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    total_gb        REAL,                    -- 31.84
-    used_gb         REAL,                    -- 11.68
-    available_gb    REAL,                    -- 20.16
-    usage_percent   REAL,                    -- 36.7
-    total_pagefile_gb REAL,                  -- 4.75
-    used_pagefile_gb REAL,                   -- 0.00
-    pagefile_usage_percent REAL,             -- 0.0
-    max_capacity_gb REAL,                    -- 0 (не определено)
-    total_slots     INTEGER,                 -- 0
-    physically_installed_gb REAL,            -- 0.00
+    total_gb        REAL,
+    used_gb         REAL,
+    available_gb    REAL,
+    usage_percent   REAL,
+    total_pagefile_gb REAL,
+    used_pagefile_gb REAL,
+    pagefile_usage_percent REAL,
+    max_capacity_gb REAL,
+    total_slots     INTEGER,
+    physically_installed_gb REAL,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 5: Модули памяти (каждый физический модуль)
--- ============================================================
 CREATE TABLE IF NOT EXISTS ram_modules (
     module_id       INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    bank_label      TEXT,                    -- "BANK 2"
-    size_gb         REAL,                    -- 16.0
-    manufacturer    TEXT,                    -- "Kingston"
-    speed_mhz       INTEGER,                 -- 2666
-    model           TEXT,                    -- "9905701-076.A00G"
+    bank_label      TEXT,
+    size_gb         REAL,
+    manufacturer    TEXT,
+    speed_mhz       INTEGER,
+    model           TEXT,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 6: Процессы, потребляющие память
--- ============================================================
 CREATE TABLE IF NOT EXISTS top_memory_processes (
     process_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    process_name    TEXT,                    -- "sqlservr.exe"
-    pid             INTEGER,                 -- 10804
-    memory_used_gb  REAL,                   -- 1.46
-    rank_position   INTEGER,                -- 1,2,3...
+    process_name    TEXT,
+    pid             INTEGER,
+    memory_used_gb  REAL,
+    rank_position   INTEGER,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 7: Диски (логические тома)
--- ============================================================
 CREATE TABLE IF NOT EXISTS logical_disks (
     disk_id         INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    drive_letter    TEXT,                    -- "C:", "D:"
-    mount_point     TEXT,                    -- "C:\"
-    filesystem      TEXT,                    -- "NTFS"
-    total_size_gb   REAL,                    -- 165.4
-    used_percent    REAL,                    -- 94.6
-    free_gb         REAL,                    -- 9.0
-    used_gb         REAL,                    -- 156.4
+    drive_letter    TEXT,
+    mount_point     TEXT,
+    filesystem      TEXT,
+    total_size_gb   REAL,
+    used_percent    REAL,
+    free_gb         REAL,
+    used_gb         REAL,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 8: Физические накопители
--- ============================================================
 CREATE TABLE IF NOT EXISTS physical_drives (
     physical_drive_id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    drive_number    INTEGER,                 -- 0
-    device_path     TEXT,                    -- "\\.\PHYSICALDRIVE0"
-    model           TEXT,                    -- "Samsung SSD 860 EVO 500GB"
-    size_gb         REAL,                    -- 465.8
-    type            TEXT,                    -- "SSD"
-    interface_type  TEXT,                    -- "IDE"
-    media_type      TEXT,                    -- "Fixed hard disk media"
+    drive_number    INTEGER,
+    device_path     TEXT,
+    model           TEXT,
+    size_gb         REAL,
+    type            TEXT,
+    interface_type  TEXT,
+    media_type      TEXT,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 9: Связь логических дисков с физическими
--- ============================================================
 CREATE TABLE IF NOT EXISTS disk_mapping (
     mapping_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
@@ -151,112 +120,87 @@ CREATE TABLE IF NOT EXISTS disk_mapping (
     FOREIGN KEY (physical_drive_id) REFERENCES physical_drives(physical_drive_id)
 );
 
--- ============================================================
--- ТАБЛИЦА 10: Графические процессоры (GPU)
--- ============================================================
 CREATE TABLE IF NOT EXISTS gpus (
     gpu_id          INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    gpu_index       INTEGER,                 -- 0
-    model           TEXT,                    -- "Intel(R) UHD Graphics 630"
-    memory_gb       REAL,                    -- 1.0
-    driver_version  TEXT,                    -- "31.0.101.2125"
+    gpu_index       INTEGER,
+    model           TEXT,
+    memory_gb       REAL,
+    driver_version  TEXT,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 11: Сетевые интерфейсы
--- ============================================================
 CREATE TABLE IF NOT EXISTS network_adapters (
     adapter_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    adapter_index   INTEGER,                 -- 2, 1, 0...
-    name            TEXT,                    -- "Ethernet 2"
-    status          TEXT,                    -- "Активен"
-    mac_address     TEXT,                    -- "04-D4-C4-AA-90-9C"
+    adapter_index   INTEGER,
+    name            TEXT,
+    status          TEXT,
+    mac_address     TEXT,
     ipv4_address    TEXT,
     ipv6_address    TEXT,
     subnet_mask     TEXT,
-    adapter_type    TEXT,                    -- "Realtek", "Microsoft", "N/A"
+    adapter_type    TEXT,
     is_unknown      BOOLEAN DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 12: Материнская плата
--- ============================================================
 CREATE TABLE IF NOT EXISTS motherboard (
     motherboard_id  INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    manufacturer    TEXT,                    -- "ASUSTeK COMPUTER INC."
-    model           TEXT,                    -- "PRIME B360M-A"
-    version         TEXT,                    -- "Rev X.0x"
-    serial_number   TEXT,                    -- "190448627601988"
-    bios_manufacturer TEXT,                  -- "American Megatrends Inc."
-    bios_version    TEXT,                    -- "ALASKA - 1072009"
-    bios_date       TEXT,                    -- "20190410000000.000000+000"
+    manufacturer    TEXT,
+    model           TEXT,
+    version         TEXT,
+    serial_number   TEXT,
+    bios_manufacturer TEXT,
+    bios_version    TEXT,
+    bios_date       TEXT,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 13: Мониторы
--- ============================================================
 CREATE TABLE IF NOT EXISTS monitors (
     monitor_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    monitor_name    TEXT,                    -- "LG IPSFULLHD(HDMI)"
-    resolution      TEXT,                    -- "1920x1080"
-    device_path     TEXT,                    -- "\\.\DISPLAY1"
+    monitor_name    TEXT,
+    resolution      TEXT,
+    device_path     TEXT,
     is_primary      BOOLEAN DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 14: Статистика по мониторам (агрегированная)
--- ============================================================
 CREATE TABLE IF NOT EXISTS monitors_summary (
     summary_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    physical_count  INTEGER,                 -- 1
-    total_count     INTEGER,                 -- 1
+    physical_count  INTEGER,
+    total_count     INTEGER,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ТАБЛИЦА 15: Батарея
--- ============================================================
 CREATE TABLE IF NOT EXISTS battery (
     battery_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id      INTEGER NOT NULL,
-    detected        BOOLEAN DEFAULT 0,       -- False = не обнаружена
-    notes           TEXT,                    -- "Не обнаружена (возможно, стационарный ПК)"
+    detected        BOOLEAN DEFAULT 0,
+    notes           TEXT,
     FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- ИНДЕКСЫ ДЛЯ УСКОРЕНИЯ ЗАПРОСОВ
--- ============================================================
-CREATE INDEX idx_os_session ON operating_system(session_id);
-CREATE INDEX idx_cpu_session ON cpu(session_id);
-CREATE INDEX idx_ram_summary_session ON ram_summary(session_id);
-CREATE INDEX idx_ram_modules_session ON ram_modules(session_id);
-CREATE INDEX idx_top_processes_session ON top_memory_processes(session_id);
-CREATE INDEX idx_logical_disks_session ON logical_disks(session_id);
-CREATE INDEX idx_physical_drives_session ON physical_drives(session_id);
-CREATE INDEX idx_gpus_session ON gpus(session_id);
-CREATE INDEX idx_network_session ON network_adapters(session_id);
-CREATE INDEX idx_motherboard_session ON motherboard(session_id);
-CREATE INDEX idx_monitors_session ON monitors(session_id);
+CREATE INDEX IF NOT EXISTS idx_os_session ON operating_system(session_id);
+CREATE INDEX IF NOT EXISTS idx_cpu_session ON cpu(session_id);
+CREATE INDEX IF NOT EXISTS idx_ram_summary_session ON ram_summary(session_id);
+CREATE INDEX IF NOT EXISTS idx_ram_modules_session ON ram_modules(session_id);
+CREATE INDEX IF NOT EXISTS idx_top_processes_session ON top_memory_processes(session_id);
+CREATE INDEX IF NOT EXISTS idx_logical_disks_session ON logical_disks(session_id);
+CREATE INDEX IF NOT EXISTS idx_physical_drives_session ON physical_drives(session_id);
+CREATE INDEX IF NOT EXISTS idx_gpus_session ON gpus(session_id);
+CREATE INDEX IF NOT EXISTS idx_network_session ON network_adapters(session_id);
+CREATE INDEX IF NOT EXISTS idx_motherboard_session ON motherboard(session_id);
+CREATE INDEX IF NOT EXISTS idx_monitors_session ON monitors(session_id);
 
--- ============================================================
--- ПРЕДСТАВЛЕНИЕ (VIEW) для полной информации о системе за сеанс
--- ============================================================
 CREATE VIEW IF NOT EXISTS v_system_full_info AS
 SELECT 
     ms.session_id,
     ms.start_time,
     ms.end_time,
-    -- ОС
     os.system_name,
     os.version,
     os.build,
@@ -264,18 +208,15 @@ SELECT
     os.manufacturer,
     os.install_date,
     os.uptime,
-    -- CPU
     cpu.model AS cpu_model,
     cpu.physical_cores,
     cpu.logical_cores,
     cpu.max_frequency_mhz,
     cpu.load_percent AS cpu_load_percent,
-    -- RAM общая
     rs.total_gb AS ram_total_gb,
     rs.used_gb AS ram_used_gb,
     rs.available_gb AS ram_available_gb,
     rs.usage_percent AS ram_usage_percent,
-    -- Материнская плата
     mb.manufacturer AS motherboard_manufacturer,
     mb.model AS motherboard_model
 FROM monitoring_sessions ms
@@ -283,3 +224,174 @@ LEFT JOIN operating_system os ON ms.session_id = os.session_id
 LEFT JOIN cpu ON ms.session_id = cpu.session_id
 LEFT JOIN ram_summary rs ON ms.session_id = rs.session_id
 LEFT JOIN motherboard mb ON ms.session_id = mb.session_id;
+"""
+
+def insert_system_data(cursor, session_id):
+    cursor.execute("""
+        INSERT INTO operating_system (
+            session_id, system_name, version, build, platform, 
+            architecture, computer_name, manufacturer, install_date, uptime
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        session_id, "Windows", "10", "10.0.19044", "Windows-10-10.0.19044-SP0",
+        "64bit", "15-2-441-5", "Майкрософт Windows 10 Корпоративная LTSC",
+        "20230411", "20260612142733.500000+180"
+    ))
+    
+    cursor.execute("""
+        INSERT INTO cpu (
+            session_id, model, manufacturer, architecture, physical_cores,
+            logical_cores, max_frequency_mhz, l2_cache_kb, l3_cache_kb,
+            socket, current_frequency_mhz, load_percent
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        session_id, "Intel(R) Core(TM) i5-8400 CPU @ 2.80GHz", "GenuineIntel", "x64",
+        6, 6, 2808, 1536, 9216, "LGA1151", 2808.0, 33.4
+    ))
+    
+    cursor.execute("""
+        INSERT INTO ram_summary (
+            session_id, total_gb, used_gb, available_gb, usage_percent,
+            total_pagefile_gb, used_pagefile_gb, pagefile_usage_percent,
+            max_capacity_gb, total_slots, physically_installed_gb
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (session_id, 31.84, 11.68, 20.16, 36.7, 4.75, 0.00, 0.0, 0, 0, 0.00))
+    
+    ram_modules = [
+        ("BANK 2", 16.0, "Kingston", 2666, "9905701-076.A00G"),
+        ("BANK 3", 16.0, "Kingston", 2666, "9905701-020.A00G")
+    ]
+    for bank, size, manufacturer, speed, model in ram_modules:
+        cursor.execute("""
+            INSERT INTO ram_modules (session_id, bank_label, size_gb, manufacturer, speed_mhz, model)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (session_id, bank, size, manufacturer, speed, model))
+    
+    processes = [
+        ("sqlservr.exe", 10804, 1.46, 1), ("Code.exe", 15944, 0.80, 2),
+        ("sqlservr.exe", 10656, 0.68, 3), ("sqlservr.exe", 10428, 0.63, 4),
+        ("sqlservr.exe", 6836, 0.52, 5)
+    ]
+    for name, pid, memory, rank in processes:
+        cursor.execute("""
+            INSERT INTO top_memory_processes (session_id, process_name, pid, memory_used_gb, rank_position)
+            VALUES (?, ?, ?, ?, ?)
+        """, (session_id, name, pid, memory, rank))
+    
+    logical_disks = [
+        ("C:", "C:\\", "NTFS", 165.4, 94.6, 9.0, 156.4),
+        ("D:", "D:\\", "NTFS", 299.7, 9.3, 271.9, 27.8)
+    ]
+    disk_ids = []
+    for letter, mount, fs, total, used_percent, free, used in logical_disks:
+        cursor.execute("""
+            INSERT INTO logical_disks (session_id, drive_letter, mount_point, filesystem, total_size_gb, used_percent, free_gb, used_gb)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (session_id, letter, mount, fs, total, used_percent, free, used))
+        disk_ids.append(cursor.lastrowid)
+    
+    cursor.execute("""
+        INSERT INTO physical_drives (session_id, drive_number, device_path, model, size_gb, type, interface_type, media_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (session_id, 0, r"\\.\PHYSICALDRIVE0", "Samsung SSD 860 EVO 500GB", 465.8, "SSD", "IDE", "Fixed hard disk media"))
+    physical_drive_id = cursor.lastrowid
+    
+    for i, disk_id in enumerate(disk_ids):
+        if i == 0:
+            cursor.execute("""
+                INSERT INTO disk_mapping (session_id, logical_disk_id, physical_drive_id)
+                VALUES (?, ?, ?)
+            """, (session_id, disk_id, physical_drive_id))
+    
+    cursor.execute("""
+        INSERT INTO gpus (session_id, gpu_index, model, memory_gb, driver_version)
+        VALUES (?, ?, ?, ?, ?)
+    """, (session_id, 0, "Intel(R) UHD Graphics 630", 1.0, "31.0.101.2125"))
+    
+    cursor.execute("""
+        INSERT INTO network_adapters (session_id, adapter_index, name, status, mac_address, ipv4_address, subnet_mask, adapter_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (session_id, 2, "Ethernet 2", "Активен", "04-D4-C4-AA-90-9C", "127.0.0.1", "255.0.0.0", "Realtek"))
+    
+    cursor.execute("""
+        INSERT INTO motherboard (session_id, manufacturer, model, version, serial_number, bios_manufacturer, bios_version, bios_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (session_id, "ASUSTeK COMPUTER INC.", "PRIME B360M-A", "Rev X.0x", "190448627601988", "American Megatrends Inc.", "ALASKA - 1072009", "20190410000000.000000+000"))
+    
+    cursor.execute("""
+        INSERT INTO monitors (session_id, monitor_name, resolution, device_path, is_primary)
+        VALUES (?, ?, ?, ?, ?)
+    """, (session_id, "LG IPSFULLHD(HDMI)", "1920x1080", r"\\.\DISPLAY1", 1))
+    
+    cursor.execute("""
+        INSERT INTO monitors_summary (session_id, physical_count, total_count)
+        VALUES (?, ?, ?)
+    """, (session_id, 1, 1))
+    
+    cursor.execute("""
+        INSERT INTO battery (session_id, detected, notes)
+        VALUES (?, ?, ?)
+    """, (session_id, 0, "Не обнаружена (возможно, стационарный ПК)"))
+
+def create_and_fill_database():
+    if os.path.exists(DB_PATH):
+        print(f"Удаляем старую базу: {DB_PATH}")
+        os.remove(DB_PATH)
+    
+    print(f"Создаём базу данных: {DB_PATH}")
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    try:
+        print("Создаём структуру таблиц...")
+        cursor.executescript(SCHEMA_SQL)
+        
+        print("Создаём сеанс мониторинга...")
+        cursor.execute("""
+            INSERT INTO monitoring_sessions (start_time, notes)
+            VALUES (?, ?)
+        """, (datetime.now().isoformat(), "Системный отчёт от 2026-06-12"))
+        
+        session_id = cursor.lastrowid
+        print(f"ID сеанса: {session_id}")
+        
+        print("Заполняем данными из отчёта...")
+        insert_system_data(cursor, session_id)
+        
+        conn.commit()
+        
+        print("\n✅ База данных успешно создана и заполнена!")
+        
+        cursor.execute("SELECT COUNT(*) as count FROM monitoring_sessions")
+        sessions_count = cursor.fetchone()["count"]
+        print(f"📊 Всего сеансов: {sessions_count}")
+        
+        cursor.execute("SELECT COUNT(*) as count FROM operating_system")
+        os_count = cursor.fetchone()["count"]
+        print(f"📊 Записей об ОС: {os_count}")
+        
+        cursor.execute("SELECT COUNT(*) as count FROM cpu")
+        cpu_count = cursor.fetchone()["count"]
+        print(f"📊 Записей о CPU: {cpu_count}")
+        
+        print("\n📋 Пример данных из представления v_system_full_info:")
+        cursor.execute("SELECT * FROM v_system_full_info LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            for key in row.keys():
+                print(f"   {key}: {row[key]}")
+        
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    
+    print(f"\n📁 База данных сохранена как: {DB_PATH}")
+    print(f"📍 Полный путь: {os.path.abspath(DB_PATH)}")
+
+if __name__ == "__main__":
+    create_and_fill_database()
