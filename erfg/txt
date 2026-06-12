@@ -1,0 +1,285 @@
+
+
+
+-- ============================================================
+-- БАЗА ДАННЫХ: system_monitor.db
+-- НАЗНАЧЕНИЕ: Хранение информации о конфигурации и состоянии системы
+-- ============================================================
+
+-- Включаем поддержку внешних ключей
+PRAGMA foreign_keys = ON;
+
+-- Включаем WAL для производительности
+PRAGMA journal_mode = WAL;
+
+-- ============================================================
+-- ТАБЛИЦА 1: Сеансы мониторинга
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monitoring_sessions (
+    session_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_time      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    end_time        DATETIME,
+    notes           TEXT
+);
+
+-- ============================================================
+-- ТАБЛИЦА 2: Операционная система
+-- ============================================================
+CREATE TABLE IF NOT EXISTS operating_system (
+    os_id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    system_name     TEXT,                    -- "Windows"
+    version         TEXT,                    -- "10"
+    build           TEXT,                    -- "10.0.19044"
+    platform        TEXT,                    -- "Windows-10-10.0.19044-SP0"
+    architecture    TEXT,                    -- "64bit"
+    computer_name   TEXT,                    -- "15-2-441-5"
+    manufacturer    TEXT,                    -- "Майкрософт Windows 10 Корпоративная LTSC"
+    install_date    TEXT,                    -- "20230411"
+    uptime          TEXT,                    -- "20260612142733.500000+180"
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 3: Процессор (основная информация)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS cpu (
+    cpu_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    model           TEXT,                    -- "Intel(R) Core(TM) i5-8400 CPU @ 2.80GHz"
+    manufacturer    TEXT,                    -- "GenuineIntel"
+    architecture    TEXT,                    -- "x64"
+    physical_cores  INTEGER,                 -- 6
+    logical_cores   INTEGER,                 -- 6
+    max_frequency_mhz INTEGER,               -- 2808
+    l2_cache_kb     INTEGER,                 -- 1536
+    l3_cache_kb     INTEGER,                 -- 9216
+    socket          TEXT,                    -- "LGA1151"
+    current_frequency_mhz REAL,              -- 2808.0
+    load_percent    REAL,                    -- 33.4
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 4: Оперативная память (общая статистика)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ram_summary (
+    ram_summary_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    total_gb        REAL,                    -- 31.84
+    used_gb         REAL,                    -- 11.68
+    available_gb    REAL,                    -- 20.16
+    usage_percent   REAL,                    -- 36.7
+    total_pagefile_gb REAL,                  -- 4.75
+    used_pagefile_gb REAL,                   -- 0.00
+    pagefile_usage_percent REAL,             -- 0.0
+    max_capacity_gb REAL,                    -- 0 (не определено)
+    total_slots     INTEGER,                 -- 0
+    physically_installed_gb REAL,            -- 0.00
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 5: Модули памяти (каждый физический модуль)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ram_modules (
+    module_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    bank_label      TEXT,                    -- "BANK 2"
+    size_gb         REAL,                    -- 16.0
+    manufacturer    TEXT,                    -- "Kingston"
+    speed_mhz       INTEGER,                 -- 2666
+    model           TEXT,                    -- "9905701-076.A00G"
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 6: Процессы, потребляющие память
+-- ============================================================
+CREATE TABLE IF NOT EXISTS top_memory_processes (
+    process_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    process_name    TEXT,                    -- "sqlservr.exe"
+    pid             INTEGER,                 -- 10804
+    memory_used_gb  REAL,                   -- 1.46
+    rank_position   INTEGER,                -- 1,2,3...
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 7: Диски (логические тома)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS logical_disks (
+    disk_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    drive_letter    TEXT,                    -- "C:", "D:"
+    mount_point     TEXT,                    -- "C:\"
+    filesystem      TEXT,                    -- "NTFS"
+    total_size_gb   REAL,                    -- 165.4
+    used_percent    REAL,                    -- 94.6
+    free_gb         REAL,                    -- 9.0
+    used_gb         REAL,                    -- 156.4
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 8: Физические накопители
+-- ============================================================
+CREATE TABLE IF NOT EXISTS physical_drives (
+    physical_drive_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    drive_number    INTEGER,                 -- 0
+    device_path     TEXT,                    -- "\\.\PHYSICALDRIVE0"
+    model           TEXT,                    -- "Samsung SSD 860 EVO 500GB"
+    size_gb         REAL,                    -- 465.8
+    type            TEXT,                    -- "SSD"
+    interface_type  TEXT,                    -- "IDE"
+    media_type      TEXT,                    -- "Fixed hard disk media"
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 9: Связь логических дисков с физическими
+-- ============================================================
+CREATE TABLE IF NOT EXISTS disk_mapping (
+    mapping_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    logical_disk_id INTEGER NOT NULL,
+    physical_drive_id INTEGER NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY (logical_disk_id) REFERENCES logical_disks(disk_id),
+    FOREIGN KEY (physical_drive_id) REFERENCES physical_drives(physical_drive_id)
+);
+
+-- ============================================================
+-- ТАБЛИЦА 10: Графические процессоры (GPU)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS gpus (
+    gpu_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    gpu_index       INTEGER,                 -- 0
+    model           TEXT,                    -- "Intel(R) UHD Graphics 630"
+    memory_gb       REAL,                    -- 1.0
+    driver_version  TEXT,                    -- "31.0.101.2125"
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 11: Сетевые интерфейсы
+-- ============================================================
+CREATE TABLE IF NOT EXISTS network_adapters (
+    adapter_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    adapter_index   INTEGER,                 -- 2, 1, 0...
+    name            TEXT,                    -- "Ethernet 2"
+    status          TEXT,                    -- "Активен"
+    mac_address     TEXT,                    -- "04-D4-C4-AA-90-9C"
+    ipv4_address    TEXT,
+    ipv6_address    TEXT,
+    subnet_mask     TEXT,
+    adapter_type    TEXT,                    -- "Realtek", "Microsoft", "N/A"
+    is_unknown      BOOLEAN DEFAULT 0,
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 12: Материнская плата
+-- ============================================================
+CREATE TABLE IF NOT EXISTS motherboard (
+    motherboard_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    manufacturer    TEXT,                    -- "ASUSTeK COMPUTER INC."
+    model           TEXT,                    -- "PRIME B360M-A"
+    version         TEXT,                    -- "Rev X.0x"
+    serial_number   TEXT,                    -- "190448627601988"
+    bios_manufacturer TEXT,                  -- "American Megatrends Inc."
+    bios_version    TEXT,                    -- "ALASKA - 1072009"
+    bios_date       TEXT,                    -- "20190410000000.000000+000"
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 13: Мониторы
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monitors (
+    monitor_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    monitor_name    TEXT,                    -- "LG IPSFULLHD(HDMI)"
+    resolution      TEXT,                    -- "1920x1080"
+    device_path     TEXT,                    -- "\\.\DISPLAY1"
+    is_primary      BOOLEAN DEFAULT 0,
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 14: Статистика по мониторам (агрегированная)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monitors_summary (
+    summary_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    physical_count  INTEGER,                 -- 1
+    total_count     INTEGER,                 -- 1
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ТАБЛИЦА 15: Батарея
+-- ============================================================
+CREATE TABLE IF NOT EXISTS battery (
+    battery_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL,
+    detected        BOOLEAN DEFAULT 0,       -- False = не обнаружена
+    notes           TEXT,                    -- "Не обнаружена (возможно, стационарный ПК)"
+    FOREIGN KEY (session_id) REFERENCES monitoring_sessions(session_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ИНДЕКСЫ ДЛЯ УСКОРЕНИЯ ЗАПРОСОВ
+-- ============================================================
+CREATE INDEX idx_os_session ON operating_system(session_id);
+CREATE INDEX idx_cpu_session ON cpu(session_id);
+CREATE INDEX idx_ram_summary_session ON ram_summary(session_id);
+CREATE INDEX idx_ram_modules_session ON ram_modules(session_id);
+CREATE INDEX idx_top_processes_session ON top_memory_processes(session_id);
+CREATE INDEX idx_logical_disks_session ON logical_disks(session_id);
+CREATE INDEX idx_physical_drives_session ON physical_drives(session_id);
+CREATE INDEX idx_gpus_session ON gpus(session_id);
+CREATE INDEX idx_network_session ON network_adapters(session_id);
+CREATE INDEX idx_motherboard_session ON motherboard(session_id);
+CREATE INDEX idx_monitors_session ON monitors(session_id);
+
+-- ============================================================
+-- ПРЕДСТАВЛЕНИЕ (VIEW) для полной информации о системе за сеанс
+-- ============================================================
+CREATE VIEW IF NOT EXISTS v_system_full_info AS
+SELECT 
+    ms.session_id,
+    ms.start_time,
+    ms.end_time,
+    -- ОС
+    os.system_name,
+    os.version,
+    os.build,
+    os.computer_name,
+    os.manufacturer,
+    os.install_date,
+    os.uptime,
+    -- CPU
+    cpu.model AS cpu_model,
+    cpu.physical_cores,
+    cpu.logical_cores,
+    cpu.max_frequency_mhz,
+    cpu.load_percent AS cpu_load_percent,
+    -- RAM общая
+    rs.total_gb AS ram_total_gb,
+    rs.used_gb AS ram_used_gb,
+    rs.available_gb AS ram_available_gb,
+    rs.usage_percent AS ram_usage_percent,
+    -- Материнская плата
+    mb.manufacturer AS motherboard_manufacturer,
+    mb.model AS motherboard_model
+FROM monitoring_sessions ms
+LEFT JOIN operating_system os ON ms.session_id = os.session_id
+LEFT JOIN cpu ON ms.session_id = cpu.session_id
+LEFT JOIN ram_summary rs ON ms.session_id = rs.session_id
+LEFT JOIN motherboard mb ON ms.session_id = mb.session_id;
